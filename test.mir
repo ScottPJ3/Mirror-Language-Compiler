@@ -1,0 +1,5 @@
+print("HELLO WORLD, I HAVE COME FOR YOU\nIt is time to die, world.")
+a="INDEED!"
+repeat 17:
+>>>print(a)
+	<<<

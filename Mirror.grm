@@ -1,0 +1,355 @@
+! Syntax for Mirror
+"Name"    = 'Mirror grammar'
+"Version" = '1.0'
+"Author"  = 'Scott Johnson'
+"About"   = 'Grammar table for the experimental Mirror language syntax'
+
+!Various character sets
+{String Char} = {Printable} - ["\]
+{Quote} = ["]
+{HexDigit} = {Digit} + [abcdef]
+{OctalCharSet} = [01234567]
+{NoZeroDigit} = [123456789]
+{ExponentPartIndicator} = [e]
+{Sign} = [-+]
+{HexEscapeSign} =[ux]
+{WS}           = {Whitespace} - {CR} - {LF}
+
+! -------------------------------------------------
+! Terminals
+! -------------------------------------------------
+
+! The following defines the Whitespace terminal using the {WS}
+! set - which excludes the carriage return and line feed 
+! characters
+
+
+!Various terminal types
+Identifier     = {Letter}({AlphaNumeric} | '_')* | '_'
+StringLiteral = '"' ( {String Char} | '\' {Printable} )* '"'
+FloatingPointLiteral   = {Digit}+'.'{Digit}+| '.'{Digit}
+FloatingPointLiteralExponent = {Digit}+'.'{Digit}+{ExponentPartIndicator}{Sign}?{Digit} | {Digit}+{ExponentPartIndicator}{Sign}?{Digit} | '.'{Digit}+{ExponentPartIndicator}{Sign}?{Digit}
+BooleanLiteral = 'true' | 'false'
+NullLiteral = 'none'
+StartWithNoZeroDecimalIntegerLiteral = {NoZeroDigit}{Digit}*
+HexIntegerLiteral = '0'('x'){HexDigit}
+OctalIntegerLiteral = '0'{OctalCharSet}
+IndentInc = '>>>'
+IndentDec = '<<<'
+
+"Case Sensitive" = 'False'
+"Start Symbol"   = <CompilationUnit>
+!"Virtual Terminals" = IndentInc | IndentDec
+"Auto Whitespace" = 'True'
+                  
+Comment Start = '#*'
+Comment End = '*#'
+!Comment Line = '#'
+ 
+Whitespace    = {WS}+
+NewLine       = {CR}{LF} | {CR} | {LF}
+
+!Various tokens              
+<nl>     ::= NewLine <nl>          !One or more
+          |  NewLine
+<nl opt> ::= NewLine <nl opt>
+          |
+
+!Literals such as reals and strings          
+<DecimalIntegerLiteral> 
+        ::= '0'
+         |  StartWithNoZeroDecimalIntegerLiteral
+
+<FloatPointLiteral> 
+        ::= FloatingPointLiteral
+         |  FloatingPointLiteralExponent
+
+<IntegerLiteral> 
+        ::= <DecimalIntegerLiteral>
+         |  HexIntegerLiteral  
+         |  OctalIntegerLiteral
+<NumberLiteral> ::= <FloatPointLiteral>
+                 | <IntegerLiteral>
+
+<Literal> 
+        ::= <NumberLiteral>
+         |  BooleanLiteral
+         |  StringLiteral
+         |  NullLiteral
+
+
+
+
+
+!Compilation unit into which all tokens must reduce
+<CompilationUnit> 
+        ::= <nl opt> <Statements>
+<Statements> ::= <Statement> | <Statement> <Statements>      
+
+!Names              
+<Name>::= Identifier
+         |  Identifier '.' <Name>
+
+<TypedVariable>::= <Name> <Name>
+                           
+<SetVariableStatement>::= <TypedVariable> '=' <Expression>
+                        | <Name> '=' <Expression>
+              
+
+!Import statements
+<ImportNamesList>::= <Name> ',' <ImportNamesList>
+                  | <Name>
+<ImportDeclarationSimple> ::= 'import' <ImportNamesList>
+<ImportDeclarationAs> ::= <ImportDeclarationSimple> 'as' <ImportNamesList>
+<ImportDeclarationFrom> ::= 'from' <Name> <ImportDeclarationSimple>
+                         | 'from' <Name> <ImportDeclarationAs>                          
+<ImportDeclaration> ::= <ImportDeclarationSimple>
+         | <ImportDeclarationAs>
+         | <ImportDeclarationFrom>
+
+!Type declarations
+
+
+<ParameterList>::= <Name> ',' <ParameterList>
+                | <Name>
+                
+<InheritanceDeclaration>::= 'from' <ParameterList>
+                         
+<ImplementationDeclarations>::= <ImplementationDeclaration> | <ImplementationDeclaration> <ImplementationDeclarations>
+<ImplementationDeclaration>::= 'implements' <ParameterList><nl>
+
+<ClassDeclaration> ::= 'class' Identifier <InheritanceDeclaration> ':' <nl> <ClassBody> | 'class' Identifier ':' <nl> <ClassBody>
+                    
+<ClassBody> 
+        ::= IndentInc <ImplementationDeclarations><ClassBodyDeclarations> IndentDec | IndentInc <ClassBodyDeclarations> IndentDec
+         | 'pass'
+               
+
+<ClassBodyDeclarations> 
+        ::= <ClassMemberDeclaration>
+         |  <ClassMemberDeclaration> <ClassBodyDeclarations>
+
+
+<ClassMemberDeclaration>
+        ::= <SetVariableStatement><nl>
+         | <TypedVariable><nl>
+         |  <MethodDeclaration><nl>
+         | 'pass'<nl>
+         
+
+!Methods
+
+         
+<MethodDeclaration> ::= <MethodHeader> <MethodBody> IndentDec
+
+<MethodHeader>
+        ::= 'def' Identifier '>' <Name> ':' <nl> IndentInc <ArgumentsList>
+         | 'def' Identifier ':' <nl> IndentInc <ArgumentsList>
+        
+<TypedVariables>::= <TypedVariable> <nl> | <TypedVariable> <nl> <TypedVariables>
+<SetVariables>::= <SetVariableStatement> <nl>
+               | <SetVariableStatement> <nl> <SetVariables>
+
+!<ArgumentListEnd> ::= <SetVariables> <ArgumentListEnd>
+!                   | <nl> '|' <nl>               
+!<ArgumentsList>::= <TypedVariables> <ArgumentsList>
+!                | <ArgumentListEnd>
+                
+<ArgumentsList>::= <SetVariables> <TypedVariables>  '|' <nl>
+               | <TypedVariables>  '|' <nl>
+               | <SetVariables> '|' <nl>
+                | '|' <nl>
+
+
+
+
+<Raise> 
+        ::= 'raise' <Expression>
+
+
+<MethodBody> 
+        ::= <Block>
+         |  'pass'
+
+
+
+!Interfaces                                   
+<InterfaceDeclaration> 
+        ::= 'interface' Identifier <InheritsInterfaces> ':' <nl> <InterfaceBody>
+         | 'interface' Identifier ':' <nl> <InterfaceBody> 
+
+<InheritsInterfaces> 
+        ::= 'from' <Name>
+         |  <InheritsInterfaces> ',' <Name>
+
+<InterfaceBody> 
+        ::= IndentInc <InterfaceMemberDeclarations> IndentDec
+
+<InterfaceMemberDeclarations> 
+        ::= <InterfaceMemberDeclaration>
+         |  <InterfaceMemberDeclarations> <InterfaceMemberDeclaration>
+
+<InterfaceMemberDeclaration> 
+        ::= <SetVariableStatement>
+         |  <MethodHeader>
+         
+!Statements
+<Block> 
+        ::= <Statement>
+         |  <Statement> <Block> 
+<IndentedBlock> ::= IndentInc <Block> IndentDec
+
+<Statement>::= <ValidStatement><nl>
+<ValidStatement>
+        ::= <IfStatement>
+         |  <WhileStatement>
+         | <UntilStatement>
+         | <RepeatStatement>
+         | <ForStatement>
+         | <WithStatement>
+         | <SetVariableStatement>
+         | <MethodInvocation>
+         | <ClassDeclaration>
+         | <InterfaceDeclaration>
+         | <BreakStatement>
+         | <ContinueStatement>
+         | <DoStatement>
+         | <ImportDeclaration>
+         | <Raise>
+         | <ReturnStatement>
+         | <TryStatement>
+         | <Assignment>
+
+!If statements
+<IfStatement>::= <IfElifStatement>
+              | <IfElifStatement> <ElseStatement>
+<IfElifStatement> 
+        ::= 'if'  <Expression> ':' <nl> <IndentedBlock>
+         | 'if'  <Expression> ':' <nl> <IndentedBlock> <ElifStatements>
+      
+<ElifStatements>::= <ElifStatement>
+                 | <ElifStatement> <ElifStatements>
+<ElifStatement>::= 'elif' <Expression> ':' <nl> <IndentedBlock>
+
+<ElseStatement>::= 'else:' <nl> <IndentedBlock>
+
+         
+!
+
+<WhileStatement> 
+        ::= 'while' <Expression> ':' <nl> <IndentedBlock>
+<UntilStatement> 
+        ::= 'until' <Expression> ':' <nl> <IndentedBlock>   
+<WithStatement>
+        ::= 'with' <Expression> 'as' <Name> ':' <nl> <IndentedBlock>
+<DoStatement> 
+        ::= 'dowhile' <Expression> ':' <nl> <IndentedBlock>
+
+<RepeatStatement> ::= 'repeat' <Expression> ':' <nl> <IndentedBlock>
+                   | 'repeat' <Expression> 'as' <Name> ':' <nl> <IndentedBlock>
+<ForStatement> 
+        ::= 'for' <Name> 'in' <Expression> ':' <nl> <IndentedBlock>
+         | 'for' <Name> 'from' <Expression> 'to' <Expression> ':' <nl> <IndentedBlock>
+
+<BreakStatement> 
+        ::= 'break'
+
+<ContinueStatement>
+        ::= 'continue'
+
+<ReturnStatement> 
+        ::= 'return'
+
+
+!Try statements
+<TryStatement>
+        ::= 'try:' <nl> <IndentedBlock> <Except>
+         |  'try:' <nl> <IndentedBlock> <Except> <Finally>
+         |  'try:' <nl> <IndentedBlock> <Finally>
+
+<Except>
+        ::= <ExceptClause>
+         | <ExceptClause> <Except>
+
+<ExceptClause>
+        ::= 'except'  <ParameterList> ':' <nl> <IndentedBlock>
+
+<Finally> 
+        ::= 'finally:' <nl> <IndentedBlock>
+
+!Expressions
+<ArgumentList> 
+        ::= <Expression>
+         |  <Expression> ',' <ArgumentList>
+
+<MethodInvocation>
+        ::= <Name> '(' <ArgumentList> ')'
+         |  <Name> '(' ')'
+
+<FieldAccess> 
+        ::= <Primary> '.' Identifier
+<Primary> 
+        ::= <Literal>
+         |  '(' <Expression> ')'
+         |  <FieldAccess>
+         |  <MethodInvocation>
+
+<UnaryExpression>
+        ::= '+' <UnaryExpression>
+         |  '-' <UnaryExpression>
+         |  <UnaryExpressionNotPlusMinus>
+
+
+<UnaryExpressionNotPlusMinus> 
+        ::= <Primary>
+         | <Name>
+
+<MultiplicativeExpression>
+        ::= <UnaryExpression>
+         |  <MultiplicativeExpression> '*' <UnaryExpression>
+         |  <MultiplicativeExpression> '/' <UnaryExpression>
+         |  <MultiplicativeExpression> '%' <UnaryExpression>
+
+<AdditiveExpression>
+        ::= <MultiplicativeExpression>
+         |  <AdditiveExpression> '+' <MultiplicativeExpression>
+         |  <AdditiveExpression> '-' <MultiplicativeExpression>
+
+
+<RelationalExpression>
+        ::= <AdditiveExpression>
+         |  <RelationalExpression> '<' <AdditiveExpression>
+         |  <RelationalExpression> '>' <AdditiveExpression>
+         |  <RelationalExpression> '<=' <AdditiveExpression>
+         |  <RelationalExpression> '>=' <AdditiveExpression>
+
+<EqualityExpression>
+        ::= <RelationalExpression>
+         |  <EqualityExpression> '==' <RelationalExpression>
+         |  <EqualityExpression> 'is' <RelationalExpression>
+         |  <EqualityExpression> '!=' <RelationalExpression>
+
+<AndExpression>
+        ::= <EqualityExpression>
+         |  <AndExpression> 'and' <EqualityExpression>
+
+<ExclusiveOrExpression>
+        ::= <AndExpression>
+         |  <ExclusiveOrExpression> 'xor' <AndExpression>
+
+<InclusiveOrExpression> 
+        ::= <ExclusiveOrExpression>
+         |  <InclusiveOrExpression> 'or' <ExclusiveOrExpression>
+
+         
+<Expression> ::= <InclusiveOrExpression>
+
+<Assignment> ::= <Name> <AssignmentOperator> <Expression>
+
+<AssignmentOperator> 
+        ::= '*='
+         |  '/='
+         |  '%='
+         |  '+='
+         |  '-='
+
